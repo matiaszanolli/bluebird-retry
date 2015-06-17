@@ -43,6 +43,9 @@
                                           // or `options.max_tries` have been attempted, whichever comes first.
                                           //
                                           // If neither is specified, then the default is to make 5 attempts.
+                                          //
+                                          // If an `errback` function is specified, then it's executed between attempts.
+                                          // This is done after wait (if defined).
             // Retry `func` until it succeeds.
             //
             // Waits `options.interval` milliseconds (default 1000) between attempts.
@@ -54,13 +57,17 @@
             // or `options.max_tries` have been attempted, whichever comes first.
             //
             // If neither is specified, then the default is to make 5 attempts.
-            function retry(func, options) {
+            //
+            // If an `errback` function is specified, then it's executed between attempts.
+            // This is done after wait (if defined).
+            function retry(func, options, errback) {
                 options = options || {};
                 var interval = typeof options.interval === 'number' ? options.interval : 1000;
                 var max_tries, giveup_time;
                 if (typeof options.max_tries !== 'undefined') {
                     max_tries = options.max_tries;
                 }
+                var errbackFn = typeof errback !== 'undefined' ? errback : Promise.resolve();
                 if (options.timeout) {
                     giveup_time = new Date().getTime() + options.timeout;
                 }
@@ -102,9 +109,11 @@
                         } else {
                             var delay = interval - (now - tryStart);
                             if (delay <= 0) {
-                                return try_once();
+                                return errbackFn().then(try_once);
                             } else {
-                                return Promise.delay(delay).then(try_once);
+                                return errbackFn().then(function () {
+                                    return Promise.delay(delay);
+                                }).then(try_once);
                             }
                         }
                     });
